@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Korrath Tech Tree</title>
+  <style>
+    :root {
+      --bg: #0b0b12;
+      --panel: #141421;
+      --card: #1b1b2e;
+      --accent: #9a4dff;
+      --accent-2: #35c0ff;
+      --good: #38d39f;
+      --warn: #ffb020;
+      --bad: #ff5b6e;
+      --text: #e9e9f4;
+      --muted: #9aa0b3;
+      --grid-gap: 20px;
+      --tier-width: 320px;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0; background: radial-gradient(1200px 800px at 15% -10%, #17172b 0%, var(--bg) 50%), var(--bg);
+      color: var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      overflow: hidden;
+    }
+    .app { display: grid; grid-template-columns: 300px 1fr; height: 100%; }
+    aside {
+      background: linear-gradient(180deg, #11111b 0%, #0f0f18 100%);
+      border-right: 1px solid #22223a; padding: 16px; overflow: auto;
+    }
+    main { position: relative; overflow: hidden; }
+    header {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 12px 16px; border-bottom: 1px solid #22223a; background: #10101a; position: sticky; top: 0; z-index: 3;
+    }
+    header .title { font-weight: 700; letter-spacing: .5px; }
+    .controls { display: flex; gap: 8px; flex-wrap: wrap; }
+    button, select { background: var(--panel); color: var(--text); border: 1px solid #2a2a44; padding: 8px 10px; border-radius: 10px; cursor: pointer; }
+    button:hover { border-color: var(--accent); }
+    .badge { padding: 6px 10px; border-radius: 999px; background: #141428; border: 1px solid #2a2a44; font-size: 12px; }
+    .badge .num { font-weight: 700; color: var(--good); }
+
+    .alert {
+      position: sticky; top: 48px; z-index: 3; margin: 8px 16px; padding: 10px 12px; border-radius: 12px;
+      background: #1a1422; border: 1px solid #342a4f; color: #e8dcff; display: none;
+    }
+
+    /* Sidebar */
+    .sidebar-section { margin-bottom: 18px; }
+    .sidebar-section h3 { margin: 10px 0 8px; color: var(--accent-2); font-size: 14px; letter-spacing: .6px; text-transform: uppercase; }
+    .mode-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .mode-toggle button.active { background: linear-gradient(180deg, #2a1f4a, #1e1636); border-color: var(--accent); }
+    .counter { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .kvar { display: grid; gap: 8px; }
+    .kvar label { display: grid; gap: 6px; font-size: 12px; color: var(--muted); }
+    .kvar input, .kvar select, .kvar textarea { background: var(--card); border: 1px solid #2a2a44; color: var(--text); padding: 8px 10px; border-radius: 10px; }
+    .kvar textarea { min-height: 80px; }
+
+    /* Canvas */
+    .canvas-wrap { position: absolute; inset: 0; overflow: auto; }
+    .canvas { position: relative; width: max(1200px, 100%); height: max(1100px, 100%); padding: 30px 40px; }
+    .grid { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: var(--tier-width); gap: var(--grid-gap); }
+    .tier-col { position: relative; padding-top: 30px; }
+    .tier-label { position: sticky; top: 60px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 8px; }
+
+    .node-col { display: grid; gap: 16px; }
+    .node {
+      position: relative; padding: 12px; border-radius: 14px; background: linear-gradient(180deg, #1a1a2b 0%, #151527 100%);
+      border: 1px solid #242446; box-shadow: 0 6px 20px rgba(0,0,0,.35);
+    }
+    .node .name { font-weight: 700; margin-bottom: 6px; }
+    .node .desc { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+    .node .meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .node .tag { font-size: 11px; padding: 4px 8px; border: 1px solid #2a2a44; border-radius: 999px; color: var(--muted); }
+    .node .cost { font-size: 12px; }
+    .node button { width: 100%; margin-top: 8px; background: #17172b; }
+
+    .node.locked { opacity: .75; }
+    .node.unlockable { outline: 2px solid var(--accent); }
+    .node.unlocked { border-color: rgba(56, 211, 159, .6); box-shadow: 0 0 0 1px rgba(56, 211, 159, .3), inset 0 0 0 1px rgba(56,211,159,.1); }
+
+    .legend { display: flex; gap: 8px; align-items: center; }
+    .legend .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); margin-right: 6px; display: inline-block; }
+    .legend .dot.unlockable { background: var(--accent); }
+    .legend .dot.unlocked { background: var(--good); }
+
+    /* Edge layer */
+    svg.edges { position: absolute; inset: 0; pointer-events: none; }
+    .edge { stroke: #3e3e66; stroke-width: 2; opacity: .7; }
+    .edge.active { stroke: var(--accent); opacity: .9; }
+    .edge.done { stroke: var(--good); opacity: 1; }
+
+    .footer { position: sticky; bottom: 0; padding: 10px 16px; background: #0e0e18; border-top: 1px solid #22223a; display: flex; gap: 8px; justify-content: space-between; align-items:center }
+    .status-dot { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:6px; background:#666; }
+    .status-dot.ok { background: var(--good); }
+    .status-dot.warn { background: var(--warn); }
+    .status-text { font-size: 12px; color: var(--muted); }
+
+    /* AUTH MODAL */
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; z-index: 10; }
+    .overlay.show { display: flex; }
+    .modal { width: 420px; max-width: 95vw; background: #151527; border: 1px solid #2a2a44; border-radius: 16px; padding: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.45); }
+    .modal h3 { margin: 0 0 8px; }
+    .modal p { margin: 4px 0 10px; color: var(--muted); font-size: 14px; }
+    .row { display: grid; gap: 8px; }
+    .row input { background: var(--card); border: 1px solid #2a2a44; color: var(--text); padding: 10px 12px; border-radius: 10px; }
+    .row .actions { display: flex; gap: 8px; margin-top: 8px; justify-content: flex-end; }
+    .muted { color: var(--muted); font-size: 12px; }
+  </style>
+  <!-- Supabase JS -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <div class="app">
+    <aside>
+      <div class="sidebar-section">
+        <h2 style="margin:4px 0 12px">Korrath Tech Tree</h2>
+        <div class="mode-toggle">
+          <button id="btnGroup" class="active">Group Tree</button>
+          <button id="btnPersonal">Personal Tree</button>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <h3>Points</h3>
+        <div class="counter">
+          <div class="badge">Group Pts: <span class="num" id="groupPts">0</span></div>
+          <div class="badge">Personal Pts: <span class="num" id="personalPts">0</span></div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <h3>Campaign State</h3>
+        <div class="kvar">
+          <label>Party Level
+            <input id="partyLevel" type="number" min="1" max="20" value="1" />
+          </label>
+          <label>Max Tier (auto from level)
+            <input id="maxTier" type="number" min="1" max="10" value="1" />
+          </label>
+          <label>Branch Filter
+            <select id="branchFilter">
+              <option value="all" selected>All</option>
+            </select>
+          </label>
+          <button id="btnRecalc">Recalculate Unlockables</button>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <h3>Data</h3>
+        <div class="kvar">
+          <label>Campaign ID
+            <input id="campaignId" placeholder="uuid" />
+          </label>
+          <label>Character ID
+            <input id="characterId" placeholder="uuid (optional for players)" />
+          </label>
+          <button id="btnGMLogin">GM Login (PIN)</button>
+          <button id="btnClaimChar">Claim/Create Character</button>
+          <button id="btnSave">Save to Local</button>
+          <button id="btnLoad">Load from Local</button>
+          <button id="btnExport">Export JSON</button>
+          <input id="importFile" type="file" accept="application/json" />
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <h3>Diagnostics</h3>
+        <div class="kvar">
+          <button id="btnReconnect">Reconnect Supabase</button>
+          <button id="btnRunTests">Run Self‑Tests</button>
+          <textarea id="diagOutput" placeholder="Diagnostics output..." readonly></textarea>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <h3>Legend</h3>
+        <div class="legend">
+          <span class="dot"></span> Locked
+          <span class="dot unlockable"></span> Unlockable
+          <span class="dot unlocked"></span> Unlocked
+        </div>
+      </div>
+
+      <div class="sidebar-section" style="margin-top:20px; font-size:12px; color:var(--muted)">
+        <div><strong>Tip:</strong> Tier 1 should align to level 1–2 milestones. Adjust the level→tier rule below if you want a slower/faster ramp.</div>
+      </div>
+
+      <div class="sidebar-section" style="margin-top:14px">
+        <h3>Reset</h3>
+        <button id="btnReset">Reset Tree (This Mode)</button>
+      </div>
+    </aside>
+
+    <main>
+      <header>
+        <div class="title">Mode: <span id="modeLabel">Group</span></div>
+        <div class="controls">
+          <button id="btnAddGroupPts">+1 Group Pt</button>
+          <button id="btnAddPersonalPts">+1 Personal Pt</button>
+          <select id="zoom">
+            <option value="0.8">Zoom 80%</option>
+            <option value="1" selected>Zoom 100%</option>
+            <option value="1.2">Zoom 120%</option>
+            <option value="1.4">Zoom 140%</option>
+          </select>
+        </div>
+      </header>
+
+      <div class="alert" id="connAlert"></div>
+
+      <div class="canvas-wrap" id="canvasWrap">
+        <div class="canvas" id="canvas">
+          <svg class="edges" id="edgeLayer"></svg>
+          <div class="grid" id="grid"></div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <div>
+          <span id="sbDot" class="status-dot"></span>
+          <span class="status-text" id="sbStatus">Supabase: connecting…</span>
+        </div>
+        <div class="controls">
+          <button id="btnSignIn">Sign In</button>
+          <button id="btnSignOut" style="display:none">Sign Out</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- AUTH MODAL -->
+  <div id="authOverlay" class="overlay" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+      <h3 id="authTitle">Sign in with a magic link</h3>
+      <p>Enter your email and we'll send you a link. Clicking it will sign you in and return you here.</p>
+      <div class="row">
+        <label>Email
+          <input id="authEmail" type="email" placeholder="you@example.com" />
+        </label>
+        <div class="actions">
+          <button id="btnSendLink">Send Magic Link</button>
+          <button id="btnCloseAuth">Close</button>
+        </div>
+        <div id="authMsg" class="muted"></div>
+      </div>
+      <p class="muted">Make sure this page's URL is allowed in Supabase → Auth → URL Configuration.</p>
+    </div>
+  </div>
+
+  <script>
+    /*************************************************
+     * UTIL / ERROR HANDLING
+     *************************************************/
+    function errToString(e) {
+      if (!e) return 'Unknown error';
+      if (typeof e === 'string') return e;
+      try {
+        if (e.error_description) return e.error_description;
+        if (e.message) return e.message;
+        return JSON.stringify(e, Object.getOwnPropertyNames(e));
+      } catch (_) { return String(e); }
+    }
+    function setAlert(msg, tone='warn') {
+      const el = document.getElementById('connAlert');
+      el.textContent = msg;
+      el.style.display = msg ? 'block' : 'none';
+      el.style.borderColor = tone==='ok' ? '#2f5' : (tone==='bad' ? '#f55' : '#ffb020');
+    }
+    function setSbStatus(text, state) {
+      const dot = document.getElementById('sbDot');
+      const st = document.getElementById('sbStatus');
+      st.textContent = text;
+      dot.classList.remove('ok','warn');
+      if (state==='ok') dot.classList.add('ok');
+      if (state==='warn') dot.classList.add('warn');
+    }
+    const emailIsValid = (e) => /.+@.+\..+/.test(String(e||'').trim());
+    const noHashUrl = () => window.location.href.split('#')[0];
+
+    function parseHashParams() {
+      const h = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : window.location.hash;
+      const p = new URLSearchParams(h);
+      const access_token = p.get('access_token');
+      const refresh_token = p.get('refresh_token');
+      const type = p.get('type');
+      return { access_token, refresh_token, type };
+    }
+
+    /*************************************************
+     * CONFIG / STATE
+     *************************************************/
+    const BUILD_VERSION = 'v0.7.1-otp-only';
+    const STATE = {
+      mode: 'group',
+      points: { group: 0, personal: 0 },
+      partyLevel: 1,
+      maxTier: 1,
+      unlocked: { group: new Set(), personal: new Set() },
+      zoom: 1,
+      branch: 'all',
+      sb: null,
+      user: null,
+      campaignId: null,
+      characterId: null,
+      isGM: false,
+      offline: false,
+    };
+
+    // Fallback dataset to let UI run when not signed in
+    const FALLBACK_TECH_DATA = [
+      { id: 'G1-survey', type: 'group', tier: 1, name: 'Scout Surveys', cost: 1, branch: 'Infrastructure', desc: 'Basic cartography outside the Dome.', req: [] },
+      { id: 'G1-power', type: 'group', tier: 1, name: 'Arc Lattice Repair', cost: 1, branch: 'Energy', desc: 'Field kits to stabilize conduit nodes.', req: [] },
+      { id: 'G2-workshop', type: 'group', tier: 2, name: 'Tinker Workshop', cost: 2, branch: 'Infrastructure', desc: 'Facility for restoring salvage.', req: ['G1-survey'] },
+      { id: 'P1-fieldkit', type: 'personal', tier: 1, name: 'Field Kit', cost: 1, branch: 'General', desc: 'Ropes, tools, rations.', req: [] },
+      { id: 'P2-finesse', type: 'personal', tier: 2, name: 'Tinkering Finesse', cost: 2, branch: 'Salvage', desc: 'Faster repair rolls.', req: ['P1-fieldkit'] },
+    ];
+
+    // Runtime tech data
+    let TECH_DATA = [];
+    const REQS = new Map(); // id -> [reqIds]
+
+    /*************************************************
+     * SUPABASE (Magic Link auth)
+     *************************************************/
+    const SUPABASE_URL = 'https://xwbekwtawoeavjalknle.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh3YmVrd3Rhd29lYXZqYWxrbmxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ3MTIyNjUsImV4cCI6MjA3MDI4ODI2NX0.47twH1UqRqaOriKWY-tOWNz40ntLR5q8IXq1icLe6bw';
+
+    async function supabaseInit() {
+      setSbStatus('Supabase: connecting…', '');
+      STATE.sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+      // Defensive: forbid any accidental anonymous sign-in calls
+      if (STATE.sb?.auth?.signInAnonymously) {
+        const orig = STATE.sb.auth.signInAnonymously.bind(STATE.sb.auth);
+        STATE.sb.auth.signInAnonymously = async (...args) => {
+          const msg = 'Anonymous sign-ins are intentionally disabled in this app. Use the Sign In → Magic Link flow.';
+          console.warn('[guard] signInAnonymously blocked');
+          setAlert(msg, 'bad');
+          throw new Error(msg);
+        };
+      }
+
+      console.log(`[Korrath] ${BUILD_VERSION} – init`);
+
+      // Handle magic-link redirect (fragment contains tokens)
+      try {
+        const { access_token, refresh_token } = parseHashParams();
+        if (access_token && refresh_token) {
+          const { data, error } = await STATE.sb.auth.setSession({ access_token, refresh_token });
+          if (error) console.warn('setSession error:', errToString(error));
+          // Clean URL
+          history.replaceState(null, document.title, noHashUrl());
+        }
+      } catch (e) { console.warn('redirect parse error', errToString(e)); }
+
+      const sess = await STATE.sb.auth.getSession();
+      STATE.user = sess?.data?.session?.user || null;
+
+      STATE.sb.auth.onAuthStateChange(async (event, session) => {
+        STATE.user = session?.user || null;
+        updateAuthUI();
+        if (STATE.user) { await loadTech(); }
+      });
+
+      updateAuthUI();
+      if (STATE.user) {
+        setSbStatus(`Signed in as ${STATE.user.email || STATE.user.id}`, 'ok');
+        await loadTech();
+        return true;
+      } else {
+        setSbStatus('Not signed in — use magic link', 'warn');
+        TECH_DATA = FALLBACK_TECH_DATA.map(n=>({...n}));
+        REQS.clear();
+        for (const n of TECH_DATA) REQS.set(n.id, n.req||[]);
+        updateBranchOptions(); render();
+        return false;
+      }
+    } = parseHashParams();
+        if (access_token && refresh_token) {
+          const { data, error } = await STATE.sb.auth.setSession({ access_token, refresh_token });
+          if (error) console.warn('setSession error:', errToString(error));
+          // Clean URL
+          history.replaceState(null, document.title, noHashUrl());
+        }
+      } catch (e) { console.warn('redirect parse error', errToString(e)); }
+
+      const sess = await STATE.sb.auth.getSession();
+      STATE.user = sess?.data?.session?.user || null;
+
+      STATE.sb.auth.onAuthStateChange(async (event, session) => {
+        STATE.user = session?.user || null;
+        updateAuthUI();
+        if (STATE.user) { await loadTech(); }
+      });
+
+      updateAuthUI();
+      if (STATE.user) {
+        setSbStatus(`Signed in as ${STATE.user.email || STATE.user.id}`, 'ok');
+        await loadTech();
+        return true;
+      } else {
+        setSbStatus('Not signed in — use magic link', 'warn');
+        TECH_DATA = FALLBACK_TECH_DATA.map(n=>({...n}));
+        REQS.clear();
+        for (const n of TECH_DATA) REQS.set(n.id, n.req||[]);
+        updateBranchOptions(); render();
+        return false;
+      }
+    }
+
+    async function sendMagicLink(email) {
+      if (!emailIsValid(email)) throw new Error('Enter a valid email.');
+      const { data, error } = await STATE.sb.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: noHashUrl() }
+      });
+      if (error) throw error;
+      return data;
+    }
+
+    async function signOut() {
+      try {
+        const { error } = await STATE.sb.auth.signOut();
+        if (error) throw error;
+        STATE.user = null; updateAuthUI(); setSbStatus('Signed out', 'warn');
+      } catch (e) {
+        alert('Sign-out error: ' + errToString(e));
+      }
+    }
+
+    function updateAuthUI() {
+      const signedIn = !!STATE.user;
+      document.getElementById('btnSignIn').style.display = signedIn ? 'none' : 'inline-block';
+      document.getElementById('btnSignOut').style.display = signedIn ? 'inline-block' : 'none';
+      document.getElementById('btnGMLogin').disabled = !signedIn;
+      document.getElementById('btnClaimChar').disabled = !signedIn;
+    }
+
+    async function loadTech() {
+      if (!STATE.sb || !STATE.user) {
+        TECH_DATA = FALLBACK_TECH_DATA.map(n => ({...n}));
+        REQS.clear();
+        for (const n of TECH_DATA) REQS.set(n.id, n.req || []);
+        updateBranchOptions();
+        render();
+        return;
+      }
+      const { data: nodes, error } = await STATE.sb
+        .from('tech_nodes')
+        .select('id,type,tier,cost,branch,name,descr,max_instances');
+      if (error) {
+        setAlert('Failed to load tech nodes: ' + errToString(error), 'bad');
+        console.error('loadTech nodes:', errToString(error));
+        TECH_DATA = FALLBACK_TECH_DATA.map(n => ({...n}));
+        REQS.clear();
+        for (const n of TECH_DATA) REQS.set(n.id, n.req || []);
+        updateBranchOptions(); render();
+        return;
+      }
+      const { data: reqs, error: e2 } = await STATE.sb
+        .from('tech_reqs')
+        .select('node_id,req_id');
+      if (e2) {
+        setAlert('Failed to load prerequisites: ' + errToString(e2), 'bad');
+        console.error('loadTech reqs:', errToString(e2));
+        TECH_DATA = FALLBACK_TECH_DATA.map(n => ({...n}));
+        REQS.clear();
+        for (const n of TECH_DATA) REQS.set(n.id, n.req || []);
+        updateBranchOptions(); render();
+        return;
+      }
+
+      REQS.clear();
+      (reqs || []).forEach(r => {
+        if (!REQS.has(r.node_id)) REQS.set(r.node_id, []);
+        REQS.get(r.node_id).push(r.req_id);
+      });
+
+      TECH_DATA = (nodes || []).map(n => ({
+        id: n.id,
+        type: n.type,
+        tier: n.tier,
+        name: n.name,
+        cost: n.cost,
+        branch: n.branch,
+        desc: n.descr,
+        max: n.max_instances,
+        req: REQS.get(n.id) || []
+      }));
+
+      updateBranchOptions();
+      render();
+    }
+
+    async function gmLogin() {
+      if (!STATE.user) { showAuthModal('Sign in first to use GM controls.'); return; }
+      const campaignId = (document.getElementById('campaignId').value || '').trim();
+      if (!campaignId) return alert('Enter Campaign ID first.');
+      const pin = prompt('Enter GM PIN for this campaign');
+      if (!pin) return;
+      const { error } = await STATE.sb.rpc('claim_campaign', { gm_pin: pin, p_campaign_id: campaignId });
+      if (error) { alert('GM claim failed: ' + errToString(error)); return; }
+      STATE.campaignId = campaignId;
+      STATE.isGM = true;
+      await refreshGroupPoints();
+      await refreshProgress('campaign', campaignId);
+      alert('GM mode unlocked for this session.');
+    }
+
+    async function claimOrCreateCharacter() {
+      if (!STATE.user) { showAuthModal('Sign in first to claim or create a character.'); return; }
+      const campaignId = (document.getElementById('campaignId').value || '').trim();
+      if (!campaignId) return alert('Enter Campaign ID first.');
+      let charId = (document.getElementById('characterId').value || '').trim();
+      const code = prompt(charId ? 'Enter your character code to claim' : 'Set a new character code');
+      if (!code) return;
+      if (!charId) {
+        const name = prompt('Character name?');
+        if (!name) return;
+        const { data, error } = await STATE.sb.rpc('create_character_with_code', { p_campaign_id: campaignId, p_name: name, p_owner_code: code });
+        if (error) { alert('Create failed: ' + errToString(error)); return; }
+        charId = data?.id;
+        document.getElementById('characterId').value = charId || '';
+      }
+      const { error } = await STATE.sb.rpc('claim_character', { owner_code: code, p_character_id: charId });
+      if (error) { alert('Claim failed: ' + errToString(error)); return; }
+      STATE.campaignId = campaignId;
+      STATE.characterId = charId;
+      await refreshPersonalPoints();
+      await refreshProgress('character', charId);
+      alert('Character claimed to this device.');
+    }
+
+    async function rpcUnlockNode(targetType, targetId, nodeId) {
+      if (!STATE.user) { showAuthModal('Sign in to unlock nodes.'); return false; }
+      const { error } = await STATE.sb.rpc('unlock_node', { target_type: targetType, p_target_id: targetId, p_node_id: nodeId });
+      if (error) { alert('Unlock failed: ' + errToString(error)); return false; }
+      if (targetType === 'campaign') await refreshGroupPoints(); else await refreshPersonalPoints();
+      await refreshProgress(targetType, targetId);
+      return true;
+    }
+
+    async function refreshGroupPoints() {
+      if (!STATE.sb || !STATE.campaignId) return;
+      const { data, error } = await STATE.sb.from('campaigns').select('group_points').eq('id', STATE.campaignId).single();
+      if (error) { setAlert('Failed to fetch group points: ' + errToString(error), 'warn'); return; }
+      STATE.points.group = data.group_points; render();
+    }
+    async function refreshPersonalPoints() {
+      if (!STATE.sb || !STATE.characterId) return;
+      const { data, error } = await STATE.sb.from('characters').select('personal_points').eq('id', STATE.characterId).single();
+      if (error) { setAlert('Failed to fetch personal points: ' + errToString(error), 'warn'); return; }
+      STATE.points.personal = data.personal_points; render();
+    }
+    async function refreshProgress(targetType, targetId) {
+      if (!STATE.sb) return;
+      const { data, error } = await STATE.sb.from('progress').select('node_id').eq('target_type', targetType).eq('target_id', targetId);
+      if (error) { setAlert('Failed to fetch progress: ' + errToString(error), 'warn'); return; }
+      const ids = new Set((data||[]).map(r => r.node_id));
+      const set = targetType === 'campaign' ? STATE.unlocked.group : STATE.unlocked.personal;
+      set.clear(); ids.forEach(id => set.add(id));
+      render();
+    }
+
+    /*************************************************
+     * AUTH MODAL WIRING
+     *************************************************/
+    function showAuthModal(msg='') {
+      document.getElementById('authMsg').textContent = msg;
+      document.getElementById('authOverlay').classList.add('show');
+      document.getElementById('authEmail').focus();
+    }
+    function hideAuthModal() {
+      document.getElementById('authOverlay').classList.remove('show');
+      document.getElementById('authMsg').textContent = '';
+    }
+
+    /*************************************************
+     * RENDERING
+     *************************************************/
+    const gridEl = document.getElementById('grid');
+    const edgeLayer = document.getElementById('edgeLayer');
+
+    function branchesFor(mode) {
+      const set = new Set();
+      TECH_DATA.filter(n => n.type === mode).forEach(n => set.add(n.branch));
+      return Array.from(set).sort();
+    }
+
+    function tiersFor(mode) {
+      const set = new Set();
+      TECH_DATA.filter(n => n.type === mode).forEach(n => set.add(n.tier));
+      return Array.from(set).sort((a,b)=>a-b);
+    }
+
+    function currentUnlockedSet() { return STATE.unlocked[STATE.mode]; }
+
+    function nodeState(node) {
+      const unlocked = currentUnlockedSet().has(node.id);
+      if (unlocked) return 'unlocked';
+      if (STATE.branch !== 'all' && node.branch !== STATE.branch) return 'locked';
+      if (node.tier > STATE.maxTier) return 'locked';
+      const reqOk = (node.req || []).every(id => currentUnlockedSet().has(id));
+      if (!reqOk) return 'locked';
+      const pool = STATE.mode === 'group' ? STATE.points.group : STATE.points.personal;
+      if (pool >= node.cost) return 'unlockable';
+      return 'locked';
+    }
+
+    function render() {
+      gridEl.innerHTML = '';
+      const tiers = tiersFor(STATE.mode);
+      const filteredNodes = TECH_DATA.filter(n => n.type === STATE.mode && (STATE.branch === 'all' || n.branch === STATE.branch));
+      const byTier = new Map();
+      tiers.forEach(t => byTier.set(t, []));
+      filteredNodes.forEach(n => byTier.get(n.tier).push(n));
+
+      for (const [t, arr] of byTier) { arr.sort((a,b)=> a.branch.localeCompare(b.branch) || a.name.localeCompare(b.name)); }
+
+      for (const t of tiers) {
+        const col = document.createElement('div');
+        col.className = 'tier-col';
+        const label = document.createElement('div');
+        label.className = 'tier-label';
+        label.textContent = `Tier ${t}`;
+        col.appendChild(label);
+
+        const nc = document.createElement('div');
+        nc.className = 'node-col';
+        (byTier.get(t) || []).forEach(node => nc.appendChild(renderNode(node)));
+        col.appendChild(nc);
+        gridEl.appendChild(col);
+      }
+
+      requestAnimationFrame(drawEdges);
+
+      document.getElementById('groupPts').textContent = STATE.points.group;
+      document.getElementById('personalPts').textContent = STATE.points.personal;
+      document.getElementById('modeLabel').textContent = STATE.mode === 'group' ? 'Group' : 'Personal';
+    }
+
+    function renderNode(node) {
+      const div = document.createElement('div');
+      div.className = `node ${nodeState(node)}`;
+      div.dataset.nodeId = node.id;
+      div.innerHTML = `
+        <div class="name">${node.name}</div>
+        <div class="desc">${node.desc}</div>
+        <div class="meta">
+          <span class="tag">Tier ${node.tier}</span>
+          <span class="tag">${node.branch}</span>
+          <span class="tag cost">Cost: ${node.cost}</span>
+        </div>
+      `;
+      if (!currentUnlockedSet().has(node.id)) {
+        const btn = document.createElement('button');
+        btn.textContent = 'Unlock';
+        btn.addEventListener('click', () => tryUnlock(node));
+        div.appendChild(btn);
+      } else {
+        const tag = document.createElement('div');
+        tag.className = 'tag';
+        tag.style.marginTop = '8px';
+        tag.textContent = 'Unlocked';
+        div.appendChild(tag);
+      }
+      return div;
+    }
+
+    function findNodeEl(id) { return document.querySelector(`[data-node-id="${id}"]`); }
+
+    function drawEdges() {
+      edgeLayer.innerHTML = '';
+      const nodes = TECH_DATA.filter(n => n.type === STATE.mode && (STATE.branch === 'all' || n.branch === STATE.branch));
+      const unlocked = currentUnlockedSet();
+      nodes.forEach(n => {
+        (n.req || []).forEach(reqId => {
+          const fromEl = findNodeEl(reqId);
+          const toEl   = findNodeEl(n.id);
+          if (!fromEl || !toEl) return;
+          const f = fromEl.getBoundingClientRect();
+          const t = toEl.getBoundingClientRect();
+          const wrap = document.getElementById('canvas').getBoundingClientRect();
+          const x1 = (f.right - wrap.left);
+          const y1 = (f.top + f.height/2 - wrap.top);
+          const x2 = (t.left - wrap.left);
+          const y2 = (t.top + t.height/2 - wrap.top);
+          const path = makeBezier(x1, y1, x2, y2);
+          const edge = document.createElementNS('http://www.w3.org/2000/svg','path');
+          edge.setAttribute('d', path);
+          edge.setAttribute('fill','none');
+          edge.setAttribute('class','edge ' + (unlocked.has(n.id) ? 'done' : nodeState(n) === 'unlockable' ? 'active' : ''));
+          edgeLayer.appendChild(edge);
+        });
+      });
+    }
+
+    function makeBezier(x1,y1,x2,y2) {
+      const dx = Math.max(40, (x2 - x1) * 0.5);
+      const c1x = x1 + dx, c1y = y1;
+      const c2x = x2 - dx, c2y = y2;
+      return `M ${x1} ${y1} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${x2} ${y2}`;
+    }
+
+    /*************************************************
+     * GAME LOGIC
+     *************************************************/
+    function tryUnlock(node) {
+      const poolKey = STATE.mode === 'group' ? 'group' : 'personal';
+      const pool = STATE.points[poolKey];
+      if (node.tier > STATE.maxTier) return alert('Tier is gated by party level.');
+      const reqOk = (node.req || []).every(id => currentUnlockedSet().has(id));
+      if (!reqOk) return alert('Prerequisites not met.');
+      if (pool < node.cost) return alert('Not enough points.');
+
+      if (STATE && STATE.sb && STATE.user) {
+        const targetType = STATE.mode === 'group' ? 'campaign' : 'character';
+        const targetId = STATE.mode === 'group' ? STATE.campaignId : STATE.characterId;
+        if (!targetId) return alert('Set Campaign/Character first.');
+        rpcUnlockNode(targetType, targetId, node.id);
+        return;
+      }
+
+      // Local fallback only
+      STATE.points[poolKey] -= node.cost;
+      currentUnlockedSet().add(node.id);
+      render();
+    }
+
+    function recalcMaxTierFromLevel() {
+      const lvl = Number(document.getElementById('partyLevel').value || 1);
+      STATE.partyLevel = lvl;
+      STATE.maxTier = levelToTier(lvl);
+      document.getElementById('maxTier').value = STATE.maxTier;
+    }
+
+    function manualSetMaxTier() {
+      STATE.maxTier = Number(document.getElementById('maxTier').value || 1);
+    }
+
+    function updateBranchOptions() {
+      const select = document.getElementById('branchFilter');
+      const list = branchesFor(STATE.mode);
+      select.innerHTML = '<option value="all">All</option>' + list.map(b=>`<option value="${b}">${b}</option>`).join('');
+    }
+
+    /*************************************************
+     * PERSISTENCE (LOCAL)
+     *************************************************/
+    const STORAGE_KEY = 'korrath-tech-tree-v1';
+    function saveLocal() {
+      const payload = {
+        points: STATE.points,
+        partyLevel: STATE.partyLevel,
+        maxTier: STATE.maxTier,
+        unlocked: {
+          group: Array.from(STATE.unlocked.group),
+          personal: Array.from(STATE.unlocked.personal)
+        }
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      alert('Saved.');
+    }
+
+    function loadLocal() {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return alert('No saved state.');
+      try {
+        const data = JSON.parse(raw);
+        STATE.points = data.points || {group:0, personal:0};
+        STATE.partyLevel = data.partyLevel || 1;
+        STATE.maxTier = data.maxTier || levelToTier(STATE.partyLevel);
+        STATE.unlocked.group = new Set(data.unlocked?.group || []);
+        STATE.unlocked.personal = new Set(data.unlocked?.personal || []);
+        document.getElementById('partyLevel').value = STATE.partyLevel;
+        document.getElementById('maxTier').value = STATE.maxTier;
+        render();
+      } catch (e) { alert('Bad save payload: ' + errToString(e)); }
+    }
+
+    function exportJSON() {
+      const blob = new Blob([JSON.stringify({ TECH_DATA, STATE: serializableState() }, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'korrath-tech-tree.json'; a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function serializableState() {
+      return {
+        mode: STATE.mode,
+        points: STATE.points,
+        partyLevel: STATE.partyLevel,
+        maxTier: STATE.maxTier,
+        unlocked: {
+          group: Array.from(STATE.unlocked.group),
+          personal: Array.from(STATE.unlocked.personal)
+        },
+        branch: STATE.branch,
+        zoom: STATE.zoom
+      };
+    }
+
+    function importJSON(file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const payload = JSON.parse(reader.result);
+          if (payload.STATE) {
+            const s = payload.STATE;
+            STATE.points = s.points || STATE.points;
+            STATE.partyLevel = s.partyLevel || STATE.partyLevel;
+            STATE.maxTier = s.maxTier || STATE.maxTier;
+            STATE.branch = s.branch || 'all';
+            STATE.zoom = s.zoom || 1;
+            STATE.unlocked.group = new Set(s.unlocked?.group || []);
+            STATE.unlocked.personal = new Set(s.unlocked?.personal || []);
+            document.getElementById('partyLevel').value = STATE.partyLevel;
+            document.getElementById('maxTier').value = STATE.maxTier;
+          }
+          render();
+        } catch (e) { alert('Import failed: ' + errToString(e)); }
+      };
+      reader.readAsText(file);
+    }
+
+    /*************************************************
+     * EVENTS & TESTS
+     *************************************************/
+    function init() {
+      document.getElementById('btnGroup').onclick = () => { STATE.mode = 'group'; setModeButton(); updateBranchOptions(); render(); };
+      document.getElementById('btnPersonal').onclick = () => { STATE.mode = 'personal'; setModeButton(); updateBranchOptions(); render(); };
+
+      document.getElementById('btnAddGroupPts').onclick = async () => {
+        if (STATE.sb && STATE.campaignId && STATE.user) {
+          const { data, error } = await STATE.sb.rpc('add_group_points', { p_campaign_id: STATE.campaignId, delta: 1 });
+          if (error) return alert(errToString(error));
+          STATE.points.group = data; render();
+        } else { STATE.points.group++; render(); }
+      };
+      document.getElementById('btnAddPersonalPts').onclick = async () => {
+        if (STATE.sb && STATE.characterId && STATE.user) {
+          const { data, error } = await STATE.sb.rpc('add_personal_points', { p_character_id: STATE.characterId, delta: 1 });
+          if (error) return alert(errToString(error));
+          STATE.points.personal = data; render();
+        } else { STATE.points.personal++; render(); }
+      };
+
+      document.getElementById('partyLevel').oninput = () => { recalcMaxTierFromLevel(); render(); };
+      document.getElementById('maxTier').oninput = () => { manualSetMaxTier(); render(); };
+      document.getElementById('branchFilter').onchange = (e) => { STATE.branch = e.target.value; render(); };
+      document.getElementById('btnRecalc').onclick = () => { recalcMaxTierFromLevel(); render(); };
+
+      document.getElementById('btnSave').onclick = saveLocal;
+      document.getElementById('btnLoad').onclick = loadLocal;
+      document.getElementById('btnExport').onclick = exportJSON;
+      document.getElementById('importFile').onchange = (e) => { if (e.target.files?.[0]) importJSON(e.target.files[0]); };
+      document.getElementById('btnReset').onclick = () => { if (!confirm('Reset unlocked nodes for this mode?')) return; STATE.unlocked[STATE.mode] = new Set(); render(); };
+
+      document.getElementById('btnSignIn').onclick = () => showAuthModal();
+      document.getElementById('btnSignOut').onclick = signOut;
+      document.getElementById('btnGMLogin').onclick = gmLogin;
+      document.getElementById('btnClaimChar').onclick = claimOrCreateCharacter;
+      document.getElementById('btnReconnect').onclick = async () => { setAlert(''); setSbStatus('Supabase: reconnecting…', ''); await supabaseInit(); };
+      document.getElementById('btnRunTests').onclick = runSelfTests;
+
+      // Auth modal buttons
+      document.getElementById('btnCloseAuth').onclick = hideAuthModal;
+      document.getElementById('btnSendLink').onclick = async () => {
+        const email = document.getElementById('authEmail').value.trim();
+        const msgEl = document.getElementById('authMsg');
+        msgEl.textContent = '';
+        try {
+          await sendMagicLink(email);
+          msgEl.textContent = 'Magic link sent! Check your inbox and click the link.';
+        } catch (e) {
+          msgEl.textContent = 'Failed to send link: ' + errToString(e);
+        }
+      };
+
+      recalcMaxTierFromLevel();
+      setModeButton();
+      updateBranchOptions();
+      render();
+
+      const wrap = document.getElementById('canvasWrap');
+      wrap.addEventListener('scroll', () => requestAnimationFrame(drawEdges));
+      window.addEventListener('resize', () => requestAnimationFrame(drawEdges));
+    }
+
+    function setModeButton() {
+      document.getElementById('btnGroup').classList.toggle('active', STATE.mode==='group');
+      document.getElementById('btnPersonal').classList.toggle('active', STATE.mode==='personal');
+    }
+
+    function runSelfTests() {
+      const out = [];
+      function ok(name) { out.push('✅ ' + name); }
+      function bad(name, e) { out.push('❌ ' + name + ' → ' + errToString(e)); }
+
+      // 1) Error serialization should not show [object Object]
+      try {
+        const e = { foo: 'bar', inner: { baz: 42 } };
+        const s = errToString(e);
+        if (s.includes('[object Object]')) throw new Error('Serialized to [object Object]');
+        ok('Error serialization avoids [object Object]');
+      } catch (e) { bad('Error serialization', e); }
+
+      // 2) Fallback data present offline
+      try {
+        if (!STATE.user) {
+          if (TECH_DATA.length === 0) throw new Error('No fallback data rendered');
+          ok('Fallback dataset renders when not signed in');
+        } else { ok('Online mode — fallback not required'); }
+      } catch (e) { bad('Fallback rendering', e); }
+
+      // 3) Node state logic sanity
+      try {
+        const sample = TECH_DATA.find(n=>n.tier===1 && n.type==='group');
+        if (!sample) throw new Error('No sample T1 group node');
+        const before = nodeState(sample);
+        STATE.points.group = 99; // enough points
+        const after = nodeState(sample);
+        if (before==='unlocked') ok('Node already unlocked (fine)');
+        else if (after!=='unlockable') throw new Error('Expected unlockable with high points');
+        ok('Node gating respects points');
+      } catch (e) { bad('Node gating', e); }
+
+      // 4) Email validation sanity
+      try {
+        if (!emailIsValid('player@example.com')) throw new Error('Valid email flagged invalid');
+        if (emailIsValid('nope@')) throw new Error('Invalid email flagged valid');
+        ok('Email validation');
+      } catch (e) { bad('Email validation', e); }
+
+      // 5) Hash parser sanity
+      try {
+        const old = window.location.hash;
+        window.location.hash = '#access_token=aaa&refresh_token=bbb&type=recovery';
+        const p = parseHashParams();
+        if (p.access_token !== 'aaa' || p.refresh_token !== 'bbb') throw new Error('Parse failed');
+        ok('Magic-link hash parsing');
+        window.location.hash = old;
+      } catch (e) { bad('Hash parser', e); }
+
+      document.getElementById('diagOutput').value = ([`Build ${BUILD_VERSION}`].concat(out)).join('
+');
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      console.log(`[Korrath] ${BUILD_VERSION} – DOM ready`);
+      await supabaseInit();
+      init();
+    });
+  </script>
+</body>
+</html>
